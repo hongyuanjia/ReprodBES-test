@@ -1,0 +1,85 @@
+on:
+  push:
+    branches:
+      - main
+      - master
+
+name: build
+
+jobs:
+  build:
+    runs-on: macOS-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RENV_PATHS_ROOT: ~/.local/share/renv
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@master
+
+      - name: Setup Pandoc
+        uses: r-lib/actions/setup-pandoc@master
+
+      - name: Setup TinyTeX
+        uses: r-lib/actions/setup-tinytex@master
+
+      - name: Install Mac system dependencies
+        if: runner.os == 'macOS'
+        run: brew install zeromq
+
+      - name: Cache Renv packages
+        uses: actions/cache@v2
+        with:
+          path: $HOME/.local/share/renv
+          key: r-${{ hashFiles('renv.lock') }}
+          restore-keys: r-
+
+      - name: Restore packages
+        shell: Rscript {0}
+        run: |
+          if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
+          renv::restore()
+
+      - name: Run targets pipeline
+        run: targets::tar_make()
+        shell: Rscript {0}
+        continue-on-error: true
+
+      - name: Render Rmarkdown file
+        shell: Rscript {0}
+        run: |
+          f <- targets::tar_read(paper)
+          html <- grep(".html", f, fixed = TRUE, value = TRUE)
+          pdf <- grep(".pdf", f, fixed = TRUE, value = TRUE)
+          if (length(html)) {
+            index <- file.path(file.path(dirname(html), "index.html"))
+            file.rename(html, index)
+            write(index, "results.txt")
+          }
+          if (length(pdf)) write(index, "results.txt", append = TRUE)
+
+      - name: Set RMarkdown output path
+        id: rmd-path
+        run: |
+          echo "::set-output name=build_dir::$(Rscript -e 'cat(dirname(targets::tar_read(paper))[1])'"
+          echo "::set-output name=html_path::$(cat results.txt | grep .html)"
+          echo "::set-output name=pdf_path::$(cat results.txt  | grep .pdf)"
+
+      - name: Upload rendered PDF
+        if: success()
+        uses: actions/upload-artifact@v2
+        with:
+          name: PDF
+          path: ${{steps.rmd.outputs.pdf_path}}
+
+      - name: Deploy to GitHub Pages
+        if: success()
+        uses: crazy-max/ghaction-github-pages@v2
+        with:
+          target_branch: gh-pages
+          build_dir: ${{steps.rmd.outputs.build_dir}}
+          jekyll: false
+          keep_history: true
