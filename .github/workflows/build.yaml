@@ -48,7 +48,7 @@ jobs:
         shell: Rscript {0}
         continue-on-error: true
 
-      - name: Render Rmarkdown file
+      - name: Retrieve Rmarkdown file
         shell: Rscript {0}
         run: |
           f <- targets::tar_read(paper)
@@ -59,10 +59,10 @@ jobs:
             file.rename(html, index)
             write(index, "results.txt")
           }
-          if (length(pdf)) write(index, "results.txt", append = TRUE)
+          if (length(pdf)) write(pdf, "results.txt", append = TRUE)
 
       - name: Set RMarkdown output path
-        id: rmd-path
+        id: rmd
         run: |
           echo "::set-output name=build_dir::$(Rscript -e 'cat(dirname(targets::tar_read(paper))[1])'"
           echo "::set-output name=html_path::$(cat results.txt | grep .html)"
