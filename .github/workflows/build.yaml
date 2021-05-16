@@ -43,6 +43,11 @@ jobs:
           if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
           renv::restore()
 
+      - name: Install EnergyPlus
+        shell: Rscript {0}
+        run: |
+          if (!eplusr::is_avail_eplus(9.4)) eplusr::install_eplus(9.4)
+
       - name: Run targets pipeline
         run: targets::tar_make()
         shell: Rscript {0}

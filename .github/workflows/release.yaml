@@ -34,11 +34,16 @@ jobs:
           key: r-${{ hashFiles('renv.lock') }}
           restore-keys: r-
 
-      - name: Install packages
+      - name: Restore packages
         shell: Rscript {0}
         run: |
           if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
           renv::restore()
+
+      - name: Install EnergyPlus
+        shell: Rscript {0}
+        run: |
+          if (!eplusr::is_avail_eplus(9.4)) eplusr::install_eplus(9.4)
 
       - name: Run targets pipeline
         run: targets::tar_make()
